@@ -3,20 +3,63 @@
 #include <avr/pgmspace.h>
 
 #define LED_PIN  5
-#define NUM_LEDS 180
-
-Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 const uint32_t GREEN_COLOR = Adafruit_NeoPixel::Color(0, 255, 0);
 const uint32_t RED_COLOR = Adafruit_NeoPixel::Color(255, 0, 0);
 const uint32_t BLUE_COLOR = Adafruit_NeoPixel::Color(0, 0, 255);
 
+void setMappedLed(uint16_t num, uint32_t color);
 void solid(uint32_t color);
 void blink(uint32_t color, uint16_t time);
 void pulse(uint32_t color, uint16_t period);
 void converge(uint32_t color, uint16_t time, uint16_t num);
 void randomPattern(uint16_t time);
 void off();
+
+// LED Mapping
+#define NUM_MAPPED_LEDS 122
+
+#define LEFT_MAP_START 0
+#define LEFT_START 0
+#define LEFT_LENGTH 41
+
+#define TOP_FRONT_MAP_START (LEFT_MAP_START + LEFT_LENGTH + 8)
+#define TOP_FRONT_START (LEFT_START + LEFT_LENGTH)
+#define TOP_FRONT_LENGTH 32
+
+#define TOP_BACK_MAP_START (LEFT_MAP_START + LEFT_LENGTH)
+#define TOP_BACK_START (TOP_FRONT_START + TOP_FRONT_LENGTH)
+#define TOP_BACK_LENGTH 40
+
+#define RIGHT_MAP_START (TOP_BACK_MAP_START + TOP_BACK_LENGTH + 12)
+#define RIGHT_START (TOP_BACK_START + TOP_BACK_LENGTH)
+#define RIGHT_LENGTH 29
+
+#define NUM_LEDS (LEFT_LENGTH + TOP_FRONT_LENGTH + TOP_BACK_LENGTH + RIGHT_LENGTH)
+
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+void setMappedLed(uint16_t num, uint32_t color) {
+  if (num >= LEFT_MAP_START && num < LEFT_MAP_START + LEFT_LENGTH) {
+    strip.setPixelColor(LEFT_START + (num - LEFT_MAP_START), color);
+  }
+  if (num >= TOP_FRONT_MAP_START && num < TOP_FRONT_MAP_START + TOP_FRONT_LENGTH) {
+    strip.setPixelColor(TOP_FRONT_START + (TOP_FRONT_LENGTH - (num - TOP_FRONT_MAP_START) - 1), color);
+  }
+  if (num >= TOP_BACK_MAP_START && num < TOP_BACK_MAP_START + TOP_BACK_LENGTH) {
+    strip.setPixelColor(TOP_BACK_START + (num - TOP_BACK_MAP_START), color);
+  }
+  if (num >= RIGHT_MAP_START && num < RIGHT_MAP_START + RIGHT_LENGTH) {
+    strip.setPixelColor(RIGHT_START + (num - RIGHT_MAP_START), color);
+  }
+}
+
+uint32_t scaleBrightness(uint32_t color, float value) {
+  uint8_t r = ((float)(color >> 16)) * value;
+  uint8_t g = ((float)((color >> 8) & 0xFF)) * value;
+  uint8_t b = ((float)(color & 0xFF)) * value;
+  return Adafruit_NeoPixel::Color(r, g, b);
+}
 
 void solid(uint32_t color) {
   for (int i = 0; i < strip.numPixels(); i++) {
@@ -46,11 +89,51 @@ void blink(uint32_t color, uint16_t time) {
  */
 void pulse(uint32_t color, uint16_t period) {
   float value = (sin(((float) (millis() % period) / (float) period) * 2.0 * PI) + 1.0) / 2.0;
-  uint8_t r = ((float)(color >> 16)) * value;
-  uint8_t g = ((float)((color >> 8) & 0xFF)) * value;
-  uint8_t b = ((float)(color & 0xFF)) * value;
+  //  uint8_t r = ((float)(color >> 16)) * value;
+  //  uint8_t g = ((float)((color >> 8) & 0xFF)) * value;
+  //  uint8_t b = ((float)(color & 0xFF)) * value;
 
-  solid(Adafruit_NeoPixel::Color(r, g, b));
+  //  solid(Adafruit_NeoPixel::Color(r, g, b));
+  solid(scaleBrightness(color, value));
+}
+
+void converge(uint32_t color, uint64_t time, uint16_t num) {
+  static uint16_t i = 0;
+  static uint64_t lastChangeTime = 0;
+  uint64_t currTime = millis();
+
+  if (currTime - lastChangeTime > time) {
+    strip.clear();
+    i++;
+    i %= NUM_MAPPED_LEDS / 2;
+
+    for (uint16_t l = 0; l < num; l++) {
+      uint32_t c = scaleBrightness(color, (1.0 / (float) num) * l);
+      setMappedLed(i - (num - l), c);
+      setMappedLed((NUM_MAPPED_LEDS - i) + (num - l), c);
+    }
+    lastChangeTime = currTime;
+  }
+}
+
+void diverge(uint32_t color, uint64_t time, uint16_t num) {
+  static uint16_t i = 0;
+  static uint64_t lastChangeTime = 0;
+  uint64_t currTime = millis();
+  static uint16_t center = NUM_MAPPED_LEDS / 2;
+
+  if (currTime - lastChangeTime > time) {
+    strip.clear();
+    i++;
+    i %= NUM_MAPPED_LEDS / 2;
+
+    for (uint16_t l = 0; l < num; l++) {
+      uint32_t c = scaleBrightness(color, (1.0 / (float) num) * l);
+      setMappedLed((center - i) + (num - l), c);
+      setMappedLed((center + i) - (num - l), c);
+    }
+    lastChangeTime = currTime;
+  }
 }
 
 void randomPattern(uint64_t time) {
@@ -65,35 +148,8 @@ void randomPattern(uint64_t time) {
   }
 }
 
-//const PROGMEM prog_uchar ledMap[] = {
-//                                10,
-//                                15
-//                              };
-//
-//const uint16_t MIN_VIRTUAL_LED_NUM  =  54;
-//const uint16_t NUM_VIRTUAL_LEDS     =   7;
-
-//void setVirtualLed(uint16_t num, uint32_t color) {
-//  while(num 
-//}
-
-//void converge(uint32_t color, uint16_t time, uint16_t num) {
-//  static uint64_t lastChangeTime = 0;
-//  static uint8_t pos = 0;
-//
-//  uint64_t currTime = millis();
-//  if (currTime - lastChangeTime > time) {
-//    for (int i = pos; i >= 0 && i >= pos - num; i--) {
-//      setVirtualLed(i, color);
-//    }
-//    lastChangeTime = currTime;
-//  }
-//}
-
 void off() {
-  for (int i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, 0, 0, 0);
-  }
+  strip.clear();
 }
 
 void setup() {
@@ -117,8 +173,10 @@ void setup() {
 
 const uint64_t BLINK_TIME          = 200;
 const uint64_t PULSE_PERIOD        = 500;
-const uint64_t CONVERGE_TIME       =   5;
-const uint8_t  CONVERGE_NUM        =   6;
+const uint64_t CONVERGE_TIME       =  10;
+const uint8_t  CONVERGE_NUM        =  15;
+const uint64_t DIVERGE_TIME        =  10;
+const uint8_t  DIVERGE_NUM         =  15;
 const uint64_t RANDOM_PATTERN_TIME =  10;
 
 const uint8_t DISABLE_CODE        = 0x3F;
@@ -185,31 +243,30 @@ void loop() {
       case PULSE_GREEN_CODE:
         animated = true;
         pulse(GREEN_COLOR, PULSE_PERIOD);
-        break;  
+        break;
       case CONVERGE_RED_CODE:
         animated = true;
-        // Not yet implemented
-//        converge(RED_COLOR, CONVERGE_TIME, CONVERGE_NUM);
+        converge(RED_COLOR, CONVERGE_TIME, CONVERGE_NUM);
         break;
       case CONVERGE_BLUE_CODE:
         animated = true;
-        // Not yet implemented
+        converge(BLUE_COLOR, CONVERGE_TIME, CONVERGE_NUM);
         break;
       case CONVERGE_GREEN_CODE:
         animated = true;
-        // Not yet implemented
+        converge(GREEN_COLOR, CONVERGE_TIME, CONVERGE_NUM);
         break;
       case DIVERGE_RED_CODE:
         animated = true;
-        // Not yet implemented
+        diverge(RED_COLOR, DIVERGE_TIME, DIVERGE_NUM);
         break;
       case DIVERGE_BLUE_CODE:
-        animated = true;
-        // Not yet implemented
+        animated = true; 
+        diverge(BLUE_COLOR, DIVERGE_TIME, DIVERGE_NUM);
         break;
       case DIVERGE_GREEN_CODE:
         animated = true;
-        // Not yet implemented
+        diverge(GREEN_COLOR, DIVERGE_TIME, DIVERGE_NUM);
         break;
       case RANDOM_PATTERN_CODE:
         animated = true;
