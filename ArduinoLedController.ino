@@ -109,8 +109,9 @@ void converge(uint32_t color, uint64_t time, uint16_t num) {
 
     for (uint16_t l = 0; l < num; l++) {
       uint32_t c = scaleBrightness(color, (1.0 / (float) num) * l);
-      setMappedLed(i - (num - l), c);
-      setMappedLed((NUM_MAPPED_LEDS - i) + (num - l), c);
+      uint16_t pos = num - l;
+      setMappedLed((i - pos) % NUM_MAPPED_LEDS, c);
+      setMappedLed(((NUM_MAPPED_LEDS - i) + pos) % NUM_MAPPED_LEDS, c);
     }
     lastChangeTime = currTime;
   }
@@ -129,8 +130,9 @@ void diverge(uint32_t color, uint64_t time, uint16_t num) {
 
     for (uint16_t l = 0; l < num; l++) {
       uint32_t c = scaleBrightness(color, (1.0 / (float) num) * l);
-      setMappedLed((center - i) + (num - l), c);
-      setMappedLed((center + i) - (num - l), c);
+      uint16_t pos = num - l;
+      setMappedLed((center - i) + pos % NUM_MAPPED_LEDS, c);
+      setMappedLed((center + i) - pos % NUM_MAPPED_LEDS, c);
     }
     lastChangeTime = currTime;
   }
